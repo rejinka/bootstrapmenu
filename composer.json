@@ -1,0 +1,16 @@
+{
+	"name": "najidev/bootstrap-menu",
+	"description": "Bridge between \\Knp\\Menu and Twitters Bootstrap",
+	"require": {
+		"knplabs/knp-menu": "*"
+	},
+	"require-dev": {
+		"symfony/routing": "*"
+	},
+	"autoload" : {
+		"psr-0" : {
+			"NajiDev\\BootstrapMenu" : "lib/"
+		}
+	},
+	"target" : "NajiDev/BootstrapMenu"
+}
