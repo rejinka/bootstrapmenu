@@ -86,8 +86,8 @@ class Renderer extends ListRenderer
         }
         else if ($item->isTypeHeader())
         {
-            // if the parent is not the root and also a type list, the item gets class nav-header
-            if ($root !== $parent && ($parent->isTypeList() || in_array('dropdown', (array) $parent->getAttribute('class'))))
+            // if the parent is a list type, the item gets class nav-header
+            if ($parent->isTypeList() || in_array('dropdown', (array) $parent->getAttribute('class')))
                 $class[] = 'nav-header';
             // nav-header are only supported by nav-list, so return nothing, if this isn't given
             else
