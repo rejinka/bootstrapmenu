@@ -2,147 +2,91 @@
 
 namespace NajiDev\BootstrapMenu;
 
-use Knp\Menu\ItemInterface as KnpItemInterface;
+use Knp\Menu\ItemInterface;
 use Knp\Menu\Renderer\ListRenderer;
-use NajiDev\BootstrapMenu\Exception\InvalidArgumentException;
+use NajiDev\BootstrapMenu\MenuItem\DividerItem;
 
 
 class Renderer extends ListRenderer
 {
-    public function render(KnpItemInterface $item, array $options = array())
+    public function render(ItemInterface $item, array $options = array())
     {
-        if (!$item instanceof \NajiDev\BootstrapMenu\ItemInterface)
-            throw new InvalidArgumentException('Please provide an instance of extended interface \NajiDev\BootstrapMenu\ItemInterface');
-
         // merge options array with defaults
         $options = array_merge(array(
             'currentClass'  => 'active',
-            'depth' => 2
+            'ancestorClass' => 'active',
+            'depth'         => 2,
+            'type'          => 'list',
+            'stacked'       => false,
+            'justified'     => false,
         ), $options);
 
-        // following ones aren't really options. they are for the implemenetation
-        $options['root'] = $item;
+        // following one isn't really an option - just for the implementation
         $options['renderingRoot'] = true;
 
         return parent::render($item, $options);
     }
 
-    protected function renderList(KnpItemInterface $item, array $attributes, array $options)
+    protected function renderList(ItemInterface $item, array $attributes, array $options)
     {
-        /** @var $item ItemInterface */
-
         $renderingRoot = $options['renderingRoot'];
         $options['renderingRoot'] = false;
-        $options['contextRoot']   = $item;
 
-        if (!$item->hasChildren() || 0 === $options['depth'] || !$item->getDisplayChildren())
-            return '';
-
+        $classes = array();
         if ($renderingRoot)
         {
-            if ($item->isTypeList())
-                $class = 'nav nav-list';
-            else if ($item->isTypePills())
-                $class = 'nav nav-pills';
-            else if ($item->isTypePillsStacked())
-                $class = 'nav nav-pills nav-stacked';
-            else if ($item->isTypeTabs())
-                $class = 'nav nav-tabs';
-            else if ($item->isTypeTabsStacked())
-                $class = 'nav nav-tabs nav-stacked';
-            else
-                $class = 'nav';
-        }
-        else
-            $class = 'dropdown-menu';
+            $classes[] = 'nav';
 
-        if (array_key_exists('class', $attributes))
-            $attributes['class'] .= ' ' . $class;
-        else
-            $attributes['class'] = $class;
+            if ('tabs' === $options['type'])
+                $classes[] = 'nav-tabs';
+            else if ('pills' === $options['type'])
+                $classes[] = 'nav-pills';
+
+            if ($options['stacked'])
+                $classes[] = 'nav-stacked';
+
+            if ($options['justified'])
+                $classes[] = 'nav-justified';
+        }
+        else if ($item->hasChildren() && $item->getDisplayChildren())
+        {
+            $classes[] = 'dropdown-menu';
+        }
+
+        if (!empty($classes))
+        {
+            $class = implode(' ', $classes);
+            if (array_key_exists('class', $attributes))
+                $attributes['class'] .= ' ' . $class;
+            else
+                $attributes['class'] = $class;
+        }
 
         return parent::renderList($item, $attributes, $options);
     }
 
-    protected function renderItem(KnpItemInterface $item, array $options)
+    protected function renderItem(ItemInterface $item, array $options)
     {
-        /** @var $item ItemInterface */
-
-        /** @var $root ItemInterface */
-        $root = $options['root'];
-
-        /** @var $parent ItemInterface */
-        $parent = $item->getParent();
-
-        $class = (array) $item->getAttribute('class');
-        if ($item->isTypeDivider())
+        if ($item instanceof DividerItem)
         {
-            // if the parent is not the root, the divider is beyond an item, which is rendered as a dropdown
-            if ($root !== $parent)
-                $class[] = 'divider';
-            // otherwise the parents type is interesting
-            else if (!$parent->isTypePillsStacked() && !$parent->isTypeTabsStacked())
-                $class[] = 'divider-vertical';
+            return $this->format('<li class="divider"></li>', 'li', $item->getLevel(), $options);
         }
-        else if ($item->isTypeHeader())
-        {
-            // if the parent is a list type, the item gets class nav-header
-            if ($parent->isTypeList() || in_array('dropdown', (array) $parent->getAttribute('class')))
-                $class[] = 'nav-header';
-            // nav-header are only supported by nav-list, so return nothing, if this isn't given
-            else
-                return '';
-        }
-        // dropdown, if it has children and depth is okay with it
-        else if (0 !== $options['depth'] && $item->hasChildren())
-            $class[] = 'dropdown';
-        // on all other items, we assume, that it will be rendered as normal item
-        else {}
-
-        /**
-         * now, we'll add "disabled", if the item
-         * - hasn't class dropdown and
-         * - isn't a divider and
-         * - isn't a header and
-         * - has no uri
-         *
-         *   or
-         *
-         * - is current but option currentAsLink is on false or
-         */
-        if (
-            (!in_array('dropdown', $class) && !$item->isTypeDivider() && !$item->isTypeHeader() && !$item->getUri())
-            ||
-            ($item->isCurrent() && !$options['currentAsLink'])
-        )
-            $class[] = 'disabled';
-
-        if (!empty($class))
-            $item->setAttribute('class', implode(' ', $class));
 
         return parent::renderItem($item, $options);
     }
 
-    protected function renderLink(KnpItemInterface $item, array $options = array())
+    protected function renderLink(ItemInterface $item, array $options = array())
     {
-        /** @var $item ItemInterface */
+        if (0 !== $options['depth'] && $item->hasChildren() && $item->getDisplayChildren())
+        {
+            $text = '<a class="dropdown-toggle" data-toggle="dropdown" href="#">' . $item->getName() . '<span class="caret"></span></a>';
+            return $this->format($text, 'link', $item->getLevel(), $options);
+        }
 
-        if ($item->isTypeDivider())
-            return '';
-
-        if ($item->isTypeHeader())
-            return $this->renderLabel($item, $options);
-
-        // if our item has children, we need to prepare a dropdown menu
-        if (0 === $options['depth'] || !$item->hasChildren())
-            return parent::renderLink($item, $options);
-
-        $text = '<a href="#" class="dropdown-toggle" data-toggle="dropdown">' . $item->getLabel() . ' <b class="caret"></b></a>';
-
-        return $this->format($text, 'link', $item->getLevel(), $options);
+        return parent::renderLink($item, $options);
     }
 
-    protected function renderSpanElement(KnpItemInterface $item, array $options)
+    protected function renderSpanElement(ItemInterface $item, array $options)
     {
         return sprintf('<a%s>%s</a>', $this->renderHtmlAttributes($item->getLabelAttributes()), $this->renderLabel($item, $options));
     }

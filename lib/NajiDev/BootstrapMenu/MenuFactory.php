@@ -2,56 +2,34 @@
 
 namespace NajiDev\BootstrapMenu;
 
-use Knp\Menu\MenuFactory as BaseMenuFactory;
+use Knp\Menu\FactoryInterface;
+use Knp\Menu\NodeInterface;
+use NajiDev\BootstrapMenu\MenuItem\DividerItem;
+use NajiDev\BootstrapMenu\MenuItem\MenuItem;
 
 
-class MenuFactory extends BaseMenuFactory
+class MenuFactory implements FactoryInterface
 {
     public function createItem($name, array $options = array())
     {
-        $options = array_merge(array(
-            // standard options
-            'uri'                => null,
-            'label'              => null,
-            'attributes'         => array(),
-            'linkAttributes'     => array(),
-            'childrenAttributes' => array(),
-            'labelAttributes'    => array(),
-            'extras'             => array(),
-            'display'            => true,
-            'displayChildren'    => true,
-
-            // root options
-            'list'    => false,
-            'pills'   => false,
-            'tabs'    => false,
-
-            // addition standard options
-            'divider' => false,
-            'header'  => false,
-
-            // this an option, which can be added to pills and tabs
-            'stacked' => false,
-        ), $options);
-
-        // first: based on the options, determine the element, which is meant
-        if ($options['list'])
-            $type = ItemInterface::TYPE_LIST;
-        else if ($options['pills'])
-            $type = $options['stacked'] ? ItemInterface::TYPE_PILLS_STACKED : ItemInterface::TYPE_PILLS;
-        else if ($options['tabs'])
-            $type = $options['stacked'] ? ItemInterface::TYPE_TABS_STACKED : ItemInterface::TYPE_TABS;
-        else if ($options['divider'])
-            $type = ItemInterface::TYPE_DIVIDER;
-        else if ($options['header'])
-            $type = ItemInterface::TYPE_HEADER;
-        else
-            $type = ItemInterface::TYPE_ITEM;
-
         $item = new MenuItem($name, $this);
 
-        return $item
-            ->setType($type)
+        $options = array_merge(
+            array(
+                'uri' => null,
+                'label' => null,
+                'attributes' => array(),
+                'linkAttributes' => array(),
+                'childrenAttributes' => array(),
+                'labelAttributes' => array(),
+                'extras' => array(),
+                'display' => true,
+                'displayChildren' => true,
+            ),
+            $options
+        );
+
+        $item
             ->setUri($options['uri'])
             ->setLabel($options['label'])
             ->setAttributes($options['attributes'])
@@ -62,5 +40,56 @@ class MenuFactory extends BaseMenuFactory
             ->setDisplay($options['display'])
             ->setDisplayChildren($options['displayChildren'])
         ;
+
+        return $item;
+    }
+
+    /**
+     * Create a menu item from a NodeInterface
+     *
+     * @param NodeInterface $node
+     * @return MenuItem
+     */
+    public function createFromNode(NodeInterface $node)
+    {
+        $item = $this->createItem($node->getName(), $node->getOptions());
+
+        foreach ($node->getChildren() as $childNode) {
+            $item->addChild($this->createFromNode($childNode));
+        }
+
+        return $item;
+    }
+
+    /**
+     * Creates a new menu item (and tree if $data['children'] is set).
+     *
+     * The source is an array of data that should match the output from MenuItem->toArray().
+     *
+     * @param  array $data The array of data to use as a source for the menu tree
+     * @param  string $name The name of the source (if not set in data['name'])
+     * @return MenuItem
+     */
+    public function createFromArray(array $data, $name = null)
+    {
+        $name = isset($data['name']) ? $data['name'] : $name;
+        if (isset($data['children'])) {
+            $children = $data['children'];
+            unset($data['children']);
+        } else {
+            $children = array();
+        }
+
+        $item = $this->createItem($name, $data);
+        foreach ($children as $name => $child) {
+            $item->addChild($this->createFromArray($child, $name));
+        }
+
+        return $item;
+    }
+
+    public function createDivider($name)
+    {
+        return new DividerItem($name, $this);
     }
 }
